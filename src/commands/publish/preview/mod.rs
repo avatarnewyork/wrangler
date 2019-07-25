@@ -29,12 +29,14 @@ pub fn preview(
 
     commands::build(&project)?;
 
-    let script_upload_form = publish::build_script_upload_form(project)?;
+    // we want to include kv namespaces when we publish, but not when we preview
+    let script_upload_form = publish::build_script_upload_form_no_kv(project)?;
 
     let res = client
         .post(create_address)
         .multipart(script_upload_form)
-        .send();
+        .send()?
+        .error_for_status();
 
     let p: Preview = serde_json::from_str(&res?.text()?)?;
 
@@ -58,6 +60,12 @@ pub fn preview(
     };
     let msg = format!("Your worker responded with: {}", worker_res);
     message::preview(&msg);
+
+    if project.kv_namespaces.is_some() {
+        message::warn(
+            "KV Namespaces are not supported in the preview. Consider defining a fallback value.",
+        );
+    }
 
     open(preview_host, https, script_id)?;
 
